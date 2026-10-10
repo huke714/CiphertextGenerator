@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文档格式与流转码助手</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 顶部状态栏 -->
+  <header class="header-bar">
+    <div class="brand-wrapper">
+      <div class="brand-icon-box">
+        <svg viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+      </div>
+      <div class="brand-heading">
+        <h1>文档格式与流转码助手</h1>
+        <p>DocStream Transform & Security Utility</p>
+      </div>
+    </div>
+    
+    <div class="header-right">
+      <button class="theme-toggle-btn" onclick="openChangeKeyModal()" title="修改系统启动访问密钥">
+        <span>🔐</span> <span>启动密钥</span>
+      </button>
+      <button class="theme-toggle-btn" onclick="lockSystem()" title="立即锁屏">
+        <span>🔒</span> <span>锁屏</span>
+      </button>
+      <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="切换明亮/深色模式">
+        <span id="themeIcon">☀️</span> <span id="themeText">明亮</span>
+      </button>
+      <span class="version-chip">v3.0</span>
+    </div>
+  </header>
+
+  <!-- 模式切换分段选择器 (支持格式自动识别高亮) -->
+  <nav class="mode-segmented-bar">
+    <button id="tabEncrypt" class="mode-tab-item active-enc" onclick="switchMode('encrypt')">
+      <svg viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      结构重编码 (加密)
+    </button>
+    <button id="tabDecrypt" class="mode-tab-item" onclick="switchMode('decrypt')">
+      <svg viewBox="0 0 24 24"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38L-2.44 1.52"/></svg>
+      逆向流解析 (解密)
+    </button>
+  </nav>
+
+  <!-- 文件拖拽交互卡片 (支持单文件与多文件批量处理) -->
+  <section id="dropZone" class="drop-zone-card" onclick="handleDropZoneClick(event)">
+    <!-- 空白状态提示 -->
+    <div id="zoneEmptyPrompt">
+      <div class="drop-icon-sphere">
+        <svg viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </div>
+      <div id="dropZoneTitle" class="drop-headline">拖拽文件至此处，或点击浏览选择</div>
+      <div class="drop-subheadline">支持单文件或多选批量处理 · 根据格式自动切换转码/解析模式</div>
+    </div>
+
+    <!-- 单文件选中展示卡片 -->
+    <div id="fileReadyCard" class="file-active-badge" style="display:none;">
+      <div class="file-meta-group">
+        <span id="badgeFileExt" class="file-extension-tag">DOC</span>
+        <div>
+          <div id="labelFileName" class="file-name-line">document.docx</div>
+          <div id="labelFileMeta" class="file-path-line">大小: 0 B | 路径: C:\...</div>
+        </div>
+      </div>
+      <button class="btn-remove-selection" onclick="clearFileSelection(event)">✕ 重新选择</button>
+    </div>
+
+    <!-- 多文件批量清单卡片 -->
+    <div id="batchReadyCard" class="batch-active-badge" style="display:none;" onclick="event.stopPropagation()">
+      <div class="batch-header-bar">
+        <div class="batch-header-title">
+          <span>📦 已选待处理清单</span>
+          <span class="batch-count-tag" id="batchCountBadge">0 个文件</span>
+          <span class="batch-size-tag" id="batchTotalSize">0 B</span>
+        </div>
+        <div class="batch-header-actions">
+          <button class="btn-batch-mini" onclick="addMoreFiles(event)">+ 添加文件</button>
+          <button class="btn-batch-mini danger" onclick="clearFileSelection(event)">✕ 清空</button>
+        </div>
+      </div>
+      <div class="batch-list-scrollbox" id="batchListContainer">
+        <!-- 动态渲染多文件条目 -->
+      </div>
+    </div>
+  </section>
+
+  <!-- 凭证设置卡片 -->
+  <section class="glass-panel">
+    <div class="panel-header-line">
+      <div class="panel-title-tag">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <span id="panelTitleText">安全校验凭证</span>
+      </div>
+      <div class="panel-header-actions">
+        <button id="btnCopyKey" class="tool-chip-btn" onclick="copyCredentials()" title="复制当前密钥到剪贴板">📋 复制密钥</button>
+        <button id="btnExportKey" class="tool-chip-btn" onclick="saveCredentials()" title="导出当前密钥备忘卡文件">💾 导出备忘卡</button>
+      </div>
+    </div>
+
+    <!-- 私钥输入行与触发按钮 -->
+    <div class="key-control-row">
+      <div class="input-with-action">
+        <input type="password" id="keyInput" placeholder="输入校验密钥，或点击右侧生成/粘贴">
+        <button type="button" class="input-inner-btn" onclick="toggleKeyVisibility()" title="切换明暗码">👁</button>
+      </div>
+      <button id="btnGenKey" class="btn-key-action primary" onclick="generateKey()" title="随机生成高强度密钥">⚡ 生成密钥</button>
+      <button id="btnPasteKey" class="btn-key-action" style="display:none;" onclick="pasteKey()" title="从系统剪贴板粘贴">📥 粘贴密钥</button>
+    </div>
+  </section>
+
+  <!-- 输出路径设置卡片 -->
+  <section class="glass-panel">
+    <div class="panel-header-line">
+      <div class="panel-title-tag">
+        <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        输出生成设置
+      </div>
+    </div>
+    <div class="output-path-box">
+      <div id="outputPathDisplay" class="output-path-label-field">等待选择文件...</div>
+      <button class="tool-chip-btn" onclick="changeOutputPath()">📂 更改输出目录/路径...</button>
+    </div>
+    <label class="checkbox-toggle-wrap">
+      <input type="checkbox" id="chkAutoOpen" checked>
+      输出生成完毕后，自动在资源管理器中定位
+    </label>
+  </section>
+
+  <!-- 实时流处理进度条面板 -->
+  <section id="progressContainer" class="progress-card-panel" style="display:none;">
+    <div class="progress-header-row">
+      <div class="progress-task-label" id="progressTaskTitle">正在处理流转码...</div>
+      <div class="progress-percent-label" id="progressPercentText">0%</div>
+    </div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+    </div>
+    <div class="progress-status-subline" id="progressStatusSubline">准备就绪...</div>
+  </section>
+
+  <!-- 核心执行输出按钮 -->
+  <button id="btnExecute" class="btn-primary-launch mode-enc" onclick="executeProcess()">
+    <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+    <span id="btnExecuteText">点击执行结构重编码并生成对应文件</span>
+  </button>
+
+  <!-- 结果输出反馈面板 -->
+  <section id="resultBanner" class="result-display-panel">
+    <div id="resultTitle" class="result-status-title">✅ 处理完成！</div>
+    <div id="resultDesc" class="result-details-text">目标文件已生成至同级目录。</div>
+    <div class="result-actions-cluster">
+      <button class="btn-result-action" onclick="openOutputFolder()">📂 打开所在文件夹</button>
+      <button class="btn-result-action" onclick="copyOutputPath()">📋 复制路径</button>
+      <button id="btnBackupPrompt" class="btn-result-action" style="color:var(--accent-light);" onclick="saveCredentials()">💾 导出备份密钥卡</button>
+    </div>
+  </section>
+
+  <!-- 密钥生成安全提示弹窗 (用户生成密钥时提示妥善保存) -->
+  <div id="keyPromptModal" class="modal-backdrop">
+    <div class="modal-dialog-card modal-key-prompt">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge key-badge">
+            <span>🔑</span>
+          </div>
+          <div>
+            <div class="modal-main-title">密钥已生成并复制到剪贴板</div>
+            <div class="modal-sub-title">已写入系统剪贴板，请核对并立即妥善备份保存</div>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeKeyModal()" title="关闭">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="key-display-card">
+          <div class="key-display-header">
+            <span>生成的唯一安全校验凭据 (Security Key)：</span>
+            <button class="badge-copy-btn" onclick="copyModalKey()" title="点击复制">📋 复制</button>
+          </div>
+          <div class="modal-key-display" id="modalKeyDisplay">
+            <!-- 动态填充密钥 -->
+          </div>
+        </div>
+
+        <div class="modal-alert-box">
+          <div class="modal-alert-title">
+            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            请务必妥善保存该密钥！
+          </div>
+          <div class="modal-alert-text">
+            加解密操作完全基于此唯一密钥。本工具不会在本地或网络存储您的密码，<strong>若遗失此密钥，转码后的文件将永久无法恢复！</strong>建议立即保存到密码管理器或导出备忘文件。
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" onclick="saveCredentials()">💾 导出备忘卡</button>
+        <button class="modal-btn modal-btn-secondary" onclick="copyModalKey()">📋 再次复制</button>
+        <button class="modal-btn modal-btn-primary" onclick="closeKeyModal()">✓ 我已妥善保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改系统启动密钥弹窗 -->
+  <div id="changeKeyModal" class="modal-backdrop">
+    <div class="modal-dialog-card modal-change-key">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <div>
+            <div class="modal-main-title">修改系统启动访问密钥</div>
+            <div class="modal-sub-title">更新每次打开应用时用于安全准入的身份口令</div>
+          </div>
+        </div>
+        <button class="modal-close-btn" onclick="closeChangeKeyModal()" title="关闭">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="form-field-group">
+          <label class="form-label" for="oldStartupKeyInput">
+            <span>当前原密钥</span>
+            <span class="required-indicator">必填验证</span>
+          </label>
+          <div class="input-with-action">
+            <input type="password" id="oldStartupKeyInput" placeholder="请输入当前原访问密钥">
+            <button type="button" class="input-inner-btn" onclick="toggleInputVisibility('oldStartupKeyInput')" title="显示/隐藏密码">👁</button>
+          </div>
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="newStartupKeyInput">
+            <span>新启动密钥</span>
+            <span class="required-indicator">不少于 4 位字符</span>
+          </label>
+          <div class="input-with-action">
+            <input type="password" id="newStartupKeyInput" placeholder="请输入新访问密钥">
+            <button type="button" class="input-inner-btn" onclick="toggleInputVisibility('newStartupKeyInput')" title="显示/隐藏密码">👁</button>
+          </div>
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="confirmStartupKeyInput">
+            <span>确认新密钥</span>
+            <span class="required-indicator">再次输入核对</span>
+          </label>
+          <div class="input-with-action">
+            <input type="password" id="confirmStartupKeyInput" placeholder="请再次输入新访问密钥">
+            <button type="button" class="input-inner-btn" onclick="toggleInputVisibility('confirmStartupKeyInput')" title="显示/隐藏密码">👁</button>
+          </div>
+        </div>
+
+        <div class="form-hint-box">
+          <span class="hint-icon">💡</span>
+          <span>修改后新口令立即生效，下次启动时请使用新密钥进入系统。</span>
+        </div>
+
+        <div id="changeKeyErrorMsg" class="lock-error-msg"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-secondary" onclick="closeChangeKeyModal()">取消</button>
+        <button class="modal-btn modal-btn-primary" onclick="submitChangeStartupKey()">💾 保存新密钥</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系统启动门禁与访问密钥锁屏 (启动时需输入密钥方可进入系统，支持双主题) -->
+  <div id="startupLockScreen" class="startup-lock-overlay">
+    <div class="lock-top-bar">
+      <button class="theme-toggle-btn" onclick="toggleTheme()" title="切换明亮/深色模式">
+        <span class="lock-theme-icon">☀️</span> <span class="lock-theme-text">明亮</span>
+      </button>
+    </div>
+    <div class="startup-lock-card">
+      <div class="lock-icon-badge">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h2 class="lock-title">系统安全访问网关</h2>
+      <p class="lock-subtitle">请输入系统启动密钥以进入工作台</p>
+
+      <div class="lock-form-block">
+        <div class="input-with-action lock-input-container">
+          <input type="password" id="startupKeyInput" placeholder="输入系统访问密钥" autofocus autocomplete="off">
+          <button type="button" class="input-inner-btn" onclick="toggleStartupKeyVisibility()" title="显/隐密码">👁</button>
+        </div>
+        <div id="lockErrorMsg" class="lock-error-msg"></div>
+
+        <button id="btnUnlockSystem" class="btn-primary-launch mode-enc" onclick="verifyStartupKey()">
+          🔓 验证并进入系统
+        </button>
+
+        <div id="lockDefaultHint" class="lock-default-hint">
+          💡 初始默认访问密钥为：<code>123456</code> (进入系统后可在右上角修改)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 浮动轻量 Toast -->
+  <div id="floatingToast" class="floating-toast">已操作</div>
+
+  <!-- 客户端脚本 -->
+  <script src="app.js"></script>
+</body>
+</html>
